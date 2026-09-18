@@ -137,6 +137,8 @@ export const PERMISSION_DEFINITIONS: {
   },
 ];
 
+export const DEFAULT_ADMIN_PIN = '1234';
+
 export function getStoredUsers(): AppUser[] {
   try {
     const raw = localStorage.getItem(USERS_STORAGE_KEY);
@@ -146,7 +148,18 @@ export function getStoredUsers(): AppUser[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      let needsSave = false;
+      const verified = parsed.map((u: AppUser) => {
+        if (u.role === 'ADMIN' && (!u.pin || u.pin.trim() === '')) {
+          needsSave = true;
+          return { ...u, pin: DEFAULT_ADMIN_PIN };
+        }
+        return u;
+      });
+      if (needsSave) {
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(verified));
+      }
+      return verified;
     }
     return DEFAULT_USERS;
   } catch {
@@ -156,10 +169,22 @@ export function getStoredUsers(): AppUser[] {
 
 export function saveStoredUsers(users: AppUser[]): void {
   try {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    // Enforce that all ADMIN users have a valid PIN before saving
+    const safeUsers = users.map((u) => {
+      if (u.role === 'ADMIN' && (!u.pin || u.pin.trim() === '')) {
+        return { ...u, pin: DEFAULT_ADMIN_PIN };
+      }
+      return u;
+    });
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(safeUsers));
   } catch (e) {
     console.error('Failed to save users', e);
   }
+}
+
+export function validateAdminPin(user: AppUser, enteredPin: string): boolean {
+  const actualPin = user.pin && user.pin.trim() !== '' ? user.pin.trim() : DEFAULT_ADMIN_PIN;
+  return enteredPin.trim() === actualPin;
 }
 
 export function getStoredCurrentUser(users: AppUser[]): AppUser {

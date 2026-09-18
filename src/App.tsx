@@ -1,20 +1,37 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AllTimeStats, EventItem, FilterOptions, GiftRecord, PaymentStatus, SummaryStats, AppUser } from './types';
 import {
   getActiveEventId,
   getStoredEvents,
   getStoredGifts,
+  INITIAL_EVENTS,
+  INITIAL_GIFTS,
   resetToSampleData,
   saveStoredEvents,
   saveStoredGifts,
   setActiveEventId,
 } from './utils/storage';
 import {
+  DEFAULT_USERS,
   getStoredUsers,
   saveStoredUsers,
   getStoredCurrentUser,
   saveStoredCurrentUser,
+  validateAdminPin,
 } from './utils/userStorage';
+import {
+  subscribeToEvents,
+  subscribeToGifts,
+  subscribeToUsers,
+  saveEventToCloud,
+  deleteEventFromCloud,
+  saveGiftToCloud,
+  deleteGiftFromCloud,
+  saveUserToCloud,
+  deleteUserFromCloud,
+  seedInitialDataToCloud,
+  syncAllLocalToCloud,
+} from './services/cloudService';
 import { exportToCSV } from './utils/formatters';
 import { Header } from './components/Header';
 import { StatsCards } from './components/StatsCards';
@@ -25,6 +42,7 @@ import { PrintView } from './components/PrintView';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { AllTimeSummaryModal } from './components/AllTimeSummaryModal';
 import { AdminUserModal } from './components/AdminUserModal';
+import { AdminPinModal, PinModalAction } from './components/AdminPinModal';
 import { ThemeMode, getInitialTheme, applyTheme } from './utils/theme';
 import { CheckCircle2, Heart, Plus, Sparkles, ShieldAlert } from 'lucide-react';
 
@@ -38,6 +56,15 @@ export default function App() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [currentUserIdState, setCurrentUserIdState] = useState<string>('');
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Mandatory Admin PIN Security & Change PIN State
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pinModalAction, setPinModalAction] = useState<PinModalAction>('OPEN_ADMIN_PANEL');
+  const [pinTargetUser, setPinTargetUser] = useState<AppUser | null>(null);
+
+  // Cloud Firestore Status
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
 
   // Apply theme effect
   useEffect(() => {
@@ -91,8 +118,9 @@ export default function App() {
     sortBy: 'date_desc',
   });
 
-  // Initial Data Load
+  // Real-time Cloud Data Synchronization & Offline-First local fallback
   useEffect(() => {
+    // 1. First load from local storage instantly for zero-latency startup
     const loadedEvents = getStoredEvents();
     const currentActiveId = getActiveEventId(loadedEvents);
     const loadedGifts = getStoredGifts();
@@ -104,9 +132,84 @@ export default function App() {
     setGifts(loadedGifts);
     setUsers(loadedUsers);
     setCurrentUserIdState(initialUser.id);
+
+    // 2. Ensure initial seed exists in Firestore if Cloud is empty
+    seedInitialDataToCloud(loadedEvents, loadedGifts, loadedUsers).catch((err) => {
+      console.warn('Initial cloud seed check:', err);
+    });
+
+    // 3. Subscribe to real-time events updates from Cloud Firestore
+    const unsubEvents = subscribeToEvents(
+      (cloudEvents) => {
+        if (cloudEvents.length > 0) {
+          setEvents(cloudEvents);
+          saveStoredEvents(cloudEvents);
+          setActiveId((prevId) => {
+            if (prevId && cloudEvents.some((e) => e.id === prevId)) return prevId;
+            return cloudEvents[0].id;
+          });
+        }
+        setIsCloudConnected(true);
+      },
+      (err) => {
+        console.warn('Events cloud sync offline or error:', err);
+        setIsCloudConnected(false);
+      }
+    );
+
+    // 4. Subscribe to real-time gifts updates from Cloud Firestore
+    const unsubGifts = subscribeToGifts(
+      (cloudGifts) => {
+        if (cloudGifts.length > 0) {
+          setGifts(cloudGifts);
+          saveStoredGifts(cloudGifts);
+        }
+        setIsCloudConnected(true);
+      },
+      (err) => {
+        console.warn('Gifts cloud sync offline or error:', err);
+        setIsCloudConnected(false);
+      }
+    );
+
+    // 5. Subscribe to real-time users updates from Cloud Firestore
+    const unsubUsers = subscribeToUsers(
+      (cloudUsers) => {
+        if (cloudUsers.length > 0) {
+          setUsers(cloudUsers);
+          saveStoredUsers(cloudUsers);
+        }
+        setIsCloudConnected(true);
+      },
+      (err) => {
+        console.warn('Users cloud sync offline or error:', err);
+        setIsCloudConnected(false);
+      }
+    );
+
+    return () => {
+      unsubEvents();
+      unsubGifts();
+      unsubUsers();
+    };
   }, []);
 
-  // Save changes to storage
+  // Manual trigger to force push all local state to Cloud
+  const handleManualCloudSync = async () => {
+    setIsCloudSyncing(true);
+    try {
+      await syncAllLocalToCloud(events, gifts, users);
+      setIsCloudConnected(true);
+      showToast('☁️ បានធ្វើសមកាលកម្មទិន្នន័យទៅកាន់ Cloud ដោយជោគជ័យ!');
+    } catch (e) {
+      console.error('Manual sync error:', e);
+      showToast('❌ បរាជ័យក្នុងការតភ្ជាប់ Cloud');
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
+
+  // Save changes to storage & Cloud
   const handleEventsChange = (newEvents: EventItem[]) => {
     setEvents(newEvents);
     saveStoredEvents(newEvents);
@@ -127,21 +230,34 @@ export default function App() {
     return users.find((u) => u.id === currentUserIdState) || users[0] || null;
   }, [users, currentUserIdState]);
 
-  // Switch User with optional PIN check (returns boolean for modal validation)
+  // Primary Admin User
+  const primaryAdminUser = useMemo(() => {
+    return users.find((u) => u.role === 'ADMIN') || users[0] || null;
+  }, [users]);
+
+  // Switch User with mandatory PIN check for Admin / PIN-protected accounts
   const handleSwitchUser = (userId: string, enteredPin?: string): boolean => {
     const target = users.find((u) => u.id === userId);
     if (!target) return false;
+    if (target.id === currentUserIdState) return true;
 
-    if (target.pin) {
-      let pinInput = enteredPin;
-      if (pinInput === undefined) {
-        const promptVal = window.prompt(`សូមបញ្ចូលលេខសម្ងាត់ PIN (៤ខ្ទង់) សម្រាប់ «${target.fullName}»:`);
-        if (promptVal === null) return false;
-        pinInput = promptVal;
-      }
+    // Check if target requires PIN (Admin users strictly require PIN, or any user with PIN)
+    const isTargetAdmin = target.role === 'ADMIN';
+    const hasPin = !!(target.pin && target.pin.trim().length > 0);
+    const requiresPin = isTargetAdmin || hasPin;
 
-      if (pinInput.trim() !== target.pin) {
-        showToast('❌ លេខសម្ងាត់ PIN មិនត្រឹមត្រូវទេ!');
+    if (requiresPin) {
+      if (enteredPin !== undefined) {
+        const isValid = validateAdminPin(target, enteredPin);
+        if (!isValid) {
+          showToast('❌ លេខកូដសម្ងាត់ PIN មិនត្រឹមត្រូវទេ!');
+          return false;
+        }
+      } else {
+        // Trigger modal prompt without using window.prompt
+        setPinTargetUser(target);
+        setPinModalAction('SWITCH_USER');
+        setIsPinModalOpen(true);
         return false;
       }
     }
@@ -150,6 +266,48 @@ export default function App() {
     saveStoredCurrentUser(userId);
     showToast(`បានប្តូរទៅកាន់គណនី: ${target.fullName} (${target.roleLabel || target.role})`);
     return true;
+  };
+
+  // Open Admin Modal (Mandatory PIN entry every time Admin is accessed)
+  const handleOpenAdminModal = () => {
+    const admin = primaryAdminUser || currentUser;
+    if (!admin) return;
+    setPinTargetUser(admin);
+    setPinModalAction('OPEN_ADMIN_PANEL');
+    setIsPinModalOpen(true);
+  };
+
+  // Open Change PIN Modal directly
+  const handleOpenChangePinModal = (targetAdmin?: AppUser) => {
+    const admin = targetAdmin || (currentUser?.role === 'ADMIN' ? currentUser : primaryAdminUser);
+    if (!admin) return;
+    setPinTargetUser(admin);
+    setPinModalAction('CHANGE_PIN_ONLY');
+    setIsPinModalOpen(true);
+  };
+
+  // Handle PIN Change Save
+  const handleChangeAdminPin = (adminId: string, newPin: string) => {
+    const updated = users.map((u) => (u.id === adminId ? { ...u, pin: newPin } : u));
+    handleUsersChange(updated);
+    const targetUser = updated.find((u) => u.id === adminId);
+    if (targetUser) {
+      saveUserToCloud(targetUser).catch((err) => console.error('Cloud save PIN error:', err));
+    }
+    showToast('បានប្តូរលេខកូដសម្ងាត់ Admin ជោគជ័យ!');
+  };
+
+  // Handle successful PIN verification from modal
+  const handlePinModalSuccess = () => {
+    setIsPinModalOpen(false);
+    if (pinModalAction === 'OPEN_ADMIN_PANEL') {
+      setIsAdminModalOpen(true);
+      showToast('ផ្ទៀងផ្ទាត់ Admin ជោគជ័យ!');
+    } else if (pinModalAction === 'SWITCH_USER' && pinTargetUser) {
+      setCurrentUserIdState(pinTargetUser.id);
+      saveStoredCurrentUser(pinTargetUser.id);
+      showToast(`បានប្តូរទៅកាន់គណនី: ${pinTargetUser.fullName} (${pinTargetUser.roleLabel || pinTargetUser.role})`);
+    }
   };
 
   // User CRUD handlers for AdminUserModal
@@ -165,12 +323,14 @@ export default function App() {
       showToast(`បានបង្កើតអ្នកប្រើប្រាស់ថ្មី «${user.fullName}»`);
     }
     handleUsersChange(updated);
+    saveUserToCloud(user).catch((err) => console.error('Cloud save user error:', err));
   };
 
   const handleDeleteUserFromModal = (userId: string) => {
     const target = users.find((u) => u.id === userId);
     const updated = users.filter((u) => u.id !== userId);
     handleUsersChange(updated);
+    deleteUserFromCloud(userId).catch((err) => console.error('Cloud delete user error:', err));
     if (target) {
       showToast(`បានលុបអ្នកប្រើប្រាស់ «${target.fullName}»`);
     }
@@ -178,25 +338,6 @@ export default function App() {
       setCurrentUserIdState(updated[0].id);
       saveStoredCurrentUser(updated[0].id);
     }
-  };
-
-  // Open Admin Modal (Require Admin PIN if current user is not ADMIN)
-  const handleOpenAdminModal = () => {
-    if (currentUser?.permissions.canManageUsers || currentUser?.role === 'ADMIN') {
-      setIsAdminModalOpen(true);
-      return;
-    }
-
-    const adminUser = users.find((u) => u.role === 'ADMIN') || users[0];
-    if (adminUser?.pin) {
-      const enteredPin = window.prompt(`តម្រូវឱ្យមានសិទ្ធិ Admin (${adminUser.fullName})។ សូមបញ្ចូលលេខកូដសម្ងាត់ PIN:`);
-      if (enteredPin === null) return;
-      if (enteredPin.trim() !== adminUser.pin) {
-        showToast('❌ លេខសម្ងាត់ Admin មិនត្រឹមត្រូវទេ!');
-        return;
-      }
-    }
-    setIsAdminModalOpen(true);
   };
 
   // Current selected event
@@ -350,15 +491,13 @@ export default function App() {
         showToast('⚠️ អ្នកមិនមានសិទ្ធិកែប្រែទិន្នន័យចំណងដៃទេ');
         return;
       }
-      const updated = gifts.map((g) =>
-        g.id === editingGift.id
-          ? {
-              ...g,
-              ...giftData,
-            }
-          : g
-      );
+      const updatedRecord: GiftRecord = {
+        ...editingGift,
+        ...giftData,
+      };
+      const updated = gifts.map((g) => (g.id === editingGift.id ? updatedRecord : g));
       handleGiftsChange(updated);
+      saveGiftToCloud(updatedRecord).catch((err) => console.error('Cloud save gift error:', err));
       showToast(`បានកែប្រែចំណងដៃរបស់ «${giftData.guestName}» ជោគជ័យ!`);
     } else {
       if (currentUser && !currentUser.permissions.canCreateGift) {
@@ -372,6 +511,7 @@ export default function App() {
         recordedAt: new Date().toISOString(),
       };
       handleGiftsChange([newRecord, ...gifts]);
+      saveGiftToCloud(newRecord).catch((err) => console.error('Cloud save new gift error:', err));
       showToast(`បានកត់ត្រាចំណងដៃរបស់ «${giftData.guestName}» ជោគជ័យ!`);
     }
 
@@ -387,9 +527,14 @@ export default function App() {
     }
 
     const newStatus: PaymentStatus = currentStatus === 'PAID' ? 'PENDING' : 'PAID';
+    const target = gifts.find((g) => g.id === id);
     const updated = gifts.map((g) => (g.id === id ? { ...g, status: newStatus } : g));
     handleGiftsChange(updated);
-    const target = gifts.find((g) => g.id === id);
+    if (target) {
+      saveGiftToCloud({ ...target, status: newStatus }).catch((err) =>
+        console.error('Cloud toggle status error:', err)
+      );
+    }
     showToast(
       newStatus === 'PAID'
         ? `បានប្តូរ «${target?.guestName || ''}» ទៅជា៖ បានទទួលរួច`
@@ -405,15 +550,13 @@ export default function App() {
     }
 
     if (editingEvent) {
-      const updated = events.map((e) =>
-        e.id === editingEvent.id
-          ? {
-              ...e,
-              ...eventData,
-            }
-          : e
-      );
+      const updatedEvt: EventItem = {
+        ...editingEvent,
+        ...eventData,
+      };
+      const updated = events.map((e) => (e.id === editingEvent.id ? updatedEvt : e));
       handleEventsChange(updated);
+      saveEventToCloud(updatedEvt).catch((err) => console.error('Cloud save event error:', err));
       showToast(`បានកែប្រែកម្មវិធី «${eventData.title}» ជោគជ័យ!`);
     } else {
       const newId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -425,6 +568,7 @@ export default function App() {
       handleEventsChange(updated);
       setActiveId(newId);
       setActiveEventId(newId);
+      saveEventToCloud(newEvt).catch((err) => console.error('Cloud save new event error:', err));
       showToast(`បានបង្កើតកម្មវិធី «${eventData.title}» ជោគជ័យ!`);
     }
 
@@ -453,6 +597,9 @@ export default function App() {
     if (deleteModal.type === 'GIFT') {
       const updated = gifts.filter((g) => g.id !== deleteModal.id);
       handleGiftsChange(updated);
+      deleteGiftFromCloud(deleteModal.id).catch((err) =>
+        console.error('Cloud delete gift error:', err)
+      );
       showToast('បានលុបទិន្នន័យចំណងដៃរួចរាល់');
     }
     setDeleteModal((prev) => ({ ...prev, isOpen: false }));
@@ -499,6 +646,9 @@ export default function App() {
         theme={theme}
         currentUser={currentUser}
         users={users}
+        isCloudConnected={isCloudConnected}
+        isCloudSyncing={isCloudSyncing}
+        onSyncCloud={handleManualCloudSync}
         onToggleTheme={handleToggleTheme}
         onSelectEvent={handleSelectEvent}
         onOpenNewEventModal={() => {
@@ -518,6 +668,7 @@ export default function App() {
         onResetSampleData={handleResetSampleData}
         onOpenAllTimeSummary={() => setIsAllTimeModalOpen(true)}
         onOpenAdminModal={handleOpenAdminModal}
+        onOpenChangePin={handleOpenChangePinModal}
         onSwitchUser={handleSwitchUser}
       />
 
@@ -636,6 +787,19 @@ export default function App() {
           onSaveUser={handleSaveUserFromModal}
           onDeleteUser={handleDeleteUserFromModal}
           onSwitchUser={handleSwitchUser}
+          onOpenChangePin={handleOpenChangePinModal}
+        />
+      )}
+
+      {/* Mandatory Admin Security PIN & Change PIN Modal */}
+      {pinTargetUser && (
+        <AdminPinModal
+          isOpen={isPinModalOpen}
+          onClose={() => setIsPinModalOpen(false)}
+          adminUser={pinTargetUser}
+          actionType={pinModalAction}
+          onSuccess={handlePinModalSuccess}
+          onChangePin={handleChangeAdminPin}
         />
       )}
 

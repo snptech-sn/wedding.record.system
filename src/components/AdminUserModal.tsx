@@ -30,6 +30,7 @@ interface AdminUserModalProps {
   onSaveUser: (user: AppUser) => void;
   onDeleteUser: (userId: string) => void;
   onSwitchUser: (userId: string, enteredPin?: string) => boolean;
+  onOpenChangePin?: (adminUser: AppUser) => void;
 }
 
 const ROLE_PRESET_OPTIONS: { role: UserRole; label: string; desc: string; badge: string }[] = [
@@ -67,6 +68,7 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
   onSaveUser,
   onDeleteUser,
   onSwitchUser,
+  onOpenChangePin,
 }) => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState<boolean>(false);
@@ -105,7 +107,7 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
     setFullName(u.fullName);
     setUsername(u.username);
     setSelectedRole(u.role);
-    setPin(u.pin || '');
+    setPin(u.pin || (u.role === 'ADMIN' ? '1234' : ''));
     setPermissions({ ...u.permissions });
     setFormError('');
   };
@@ -118,6 +120,9 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
 
   const handleRoleChange = (role: UserRole) => {
     setSelectedRole(role);
+    if (role === 'ADMIN' && !pin.trim()) {
+      setPin('1234');
+    }
     if (role !== 'CUSTOM') {
       setPermissions(getRoleDefaultPermissions(role));
     }
@@ -140,6 +145,17 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
     if (!username.trim()) {
       setFormError('សូមបញ្ចូលឈ្មោះគណនី (Username)');
       return;
+    }
+
+    if (selectedRole === 'ADMIN') {
+      if (!pin.trim()) {
+        setFormError('គណនី Admin/អ្នកគ្រប់គ្រង តម្រូវឱ្យមានលេខកូដសម្ងាត់ (PIN) ជាដាច់ខាត!');
+        return;
+      }
+      if (pin.trim().length < 4) {
+        setFormError('លេខកូដសម្ងាត់ Admin ត្រូវតែមានយ៉ាងតិច ៤ ខ្ទង់');
+        return;
+      }
     }
 
     const roleMeta = ROLE_PRESET_OPTIONS.find((r) => r.role === selectedRole);
@@ -310,16 +326,30 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
               </div>
             </div>
 
-            {!isCreating && !editingUserId && (
-              <button
-                type="button"
-                onClick={startCreateUser}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 rounded-xl shadow-xs transition-all cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>បន្ថែមអ្នកប្រើប្រាស់ថ្មី</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {currentUser.role === 'ADMIN' && onOpenChangePin && (
+                <button
+                  type="button"
+                  onClick={() => onOpenChangePin(currentUser)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-100/90 dark:bg-amber-950/60 hover:bg-amber-200/90 rounded-xl border border-amber-300/80 dark:border-amber-800/60 transition-all cursor-pointer shadow-2xs"
+                  title="ប្តូរលេខកូដសម្ងាត់ Admin តាមតម្រូវការ"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>ប្តូរលេខកូដ PIN Admin</span>
+                </button>
+              )}
+
+              {!isCreating && !editingUserId && (
+                <button
+                  type="button"
+                  onClick={startCreateUser}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 rounded-xl shadow-xs transition-all cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>បន្ថែមអ្នកប្រើប្រាស់ថ្មី</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Form for Creating or Editing User */}
@@ -382,21 +412,38 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      កូដសម្ងាត់ PIN (ស្រេចចិត្ត - ៤ ខ្ទង់)
+                      {selectedRole === 'ADMIN' ? (
+                        <span className="text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>កូដសម្ងាត់ PIN (ចាំបាច់ជាដាច់ខាតសម្រាប់ Admin) *</span>
+                        </span>
+                      ) : (
+                        <span>កូដសម្ងាត់ PIN (ស្រេចចិត្ត - ៤ ខ្ទង់)</span>
+                      )}
                     </label>
                     <div className="relative">
                       <input
                         type="password"
                         maxLength={8}
-                        placeholder="ឧ. 1234 (ទុកទទេបើមិនចង់ដាក់)"
+                        required={selectedRole === 'ADMIN'}
+                        placeholder={selectedRole === 'ADMIN' ? 'ឧ. 1234 (ចាំបាច់យ៉ាងតិច ៤ ខ្ទង់)' : 'ឧ. 1234 (ទុកទទេបើមិនចង់ដាក់)'}
                         value={pin}
-                        onChange={(e) => setPin(e.target.value)}
-                        className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-slate-900 dark:text-white"
+                        onChange={(e) => {
+                          setFormError('');
+                          setPin(e.target.value.replace(/\D/g, ''));
+                        }}
+                        className={`w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-slate-900 dark:text-white font-mono ${
+                          selectedRole === 'ADMIN'
+                            ? 'border-rose-300 dark:border-rose-800 bg-rose-50/20 dark:bg-rose-950/20'
+                            : 'border-slate-200 dark:border-slate-700'
+                        }`}
                       />
-                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3" />
+                      <Lock className={`w-3.5 h-3.5 absolute right-3 top-3 ${selectedRole === 'ADMIN' ? 'text-rose-600' : 'text-slate-400'}`} />
                     </div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                      ប្រើសម្រាប់ផ្ទៀងផ្ទាត់ពេលប្តូរគណនីប្រើប្រាស់
+                    <span className={`text-[10px] mt-1 block ${selectedRole === 'ADMIN' ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-slate-500 dark:text-slate-400'}`}>
+                      {selectedRole === 'ADMIN'
+                        ? '⚠️ ត្រូវតែបញ្ចូលកូដនេះរាល់ពេលចូលប្រើ Admin ឬបើកផ្ទាំង Admin Panel'
+                        : 'ប្រើសម្រាប់ផ្ទៀងផ្ទាត់ពេលប្តូរគណនីប្រើប្រាស់'}
                     </span>
                   </div>
 
@@ -595,6 +642,18 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
                         <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 px-2 py-1 flex items-center gap-1">
                           <Check className="w-3.5 h-3.5" /> សកម្ម
                         </span>
+                      )}
+
+                      {u.role === 'ADMIN' && onOpenChangePin && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenChangePin(u)}
+                          title="ប្តូរលេខកូដសម្ងាត់ Admin"
+                          className="px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 rounded-xl transition-all flex items-center gap-1 border border-amber-200/80 dark:border-amber-800/60 cursor-pointer"
+                        >
+                          <KeyRound className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                          <span>ប្តូរ PIN</span>
+                        </button>
                       )}
 
                       <button

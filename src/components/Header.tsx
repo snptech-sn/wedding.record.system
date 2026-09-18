@@ -20,8 +20,13 @@ import {
   ShieldCheck,
   CheckCircle2,
   Lock,
+  KeyRound,
   MoreVertical,
   Sliders,
+  Cloud,
+  CloudCheck,
+  CloudOff,
+  RefreshCw,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -31,6 +36,9 @@ interface HeaderProps {
   theme: ThemeMode;
   currentUser: AppUser | null;
   users: AppUser[];
+  isCloudConnected?: boolean;
+  isCloudSyncing?: boolean;
+  onSyncCloud?: () => void;
   onToggleTheme: () => void;
   onSelectEvent: (eventId: string) => void;
   onOpenNewEventModal: () => void;
@@ -41,6 +49,7 @@ interface HeaderProps {
   onResetSampleData: () => void;
   onOpenAllTimeSummary: () => void;
   onOpenAdminModal: () => void;
+  onOpenChangePin?: () => void;
   onSwitchUser: (userId: string) => void;
 }
 
@@ -51,6 +60,9 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   currentUser,
   users,
+  isCloudConnected = true,
+  isCloudSyncing = false,
+  onSyncCloud,
   onToggleTheme,
   onSelectEvent,
   onOpenNewEventModal,
@@ -61,6 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
   onResetSampleData,
   onOpenAllTimeSummary,
   onOpenAdminModal,
+  onOpenChangePin,
   onSwitchUser,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -212,6 +225,42 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Right Column: Clean, Grouped & Beautifully Organized Actions Toolbar */}
           <div className="flex items-center justify-end gap-1.5 sm:gap-2 flex-wrap lg:flex-nowrap">
             
+            {/* Group 0: Cloud Sync Status Indicator */}
+            <div
+              className={`inline-flex items-center gap-1.5 h-9 px-2.5 rounded-xl border text-xs font-medium transition-all shadow-2xs ${
+                isCloudConnected
+                  ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200/80 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300'
+                  : 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-200/80 dark:border-rose-800/60 text-rose-800 dark:text-rose-300'
+              }`}
+              title={
+                isCloudConnected
+                  ? 'ទិន្នន័យត្រូវបានភ្ជាប់ និងរក្សាទុកនៅលើ Google Cloud Firestore (ពេលវេលាជាក់ស្តែង Real-time)'
+                  : 'កំពុងតភ្ជាប់ទៅកាន់ Cloud...'
+              }
+            >
+              {isCloudSyncing ? (
+                <RefreshCw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-spin shrink-0" />
+              ) : isCloudConnected ? (
+                <CloudCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              ) : (
+                <CloudOff className="w-4 h-4 text-rose-500 shrink-0" />
+              )}
+              <span className="hidden sm:inline font-semibold">
+                {isCloudSyncing ? 'កំពុង Sync...' : isCloudConnected ? 'Cloud Sync' : 'Cloud Offline'}
+              </span>
+              {onSyncCloud && (
+                <button
+                  type="button"
+                  onClick={onSyncCloud}
+                  disabled={isCloudSyncing}
+                  className="p-1 hover:bg-emerald-200/50 dark:hover:bg-emerald-800/50 rounded-md cursor-pointer transition-colors text-emerald-700 dark:text-emerald-300 disabled:opacity-50"
+                  title="ចុចដើម្បីធ្វើសមកាលកម្មទិន្នន័យទៅ Cloud ឡើងវិញ"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isCloudSyncing ? 'animate-spin' : ''}`} />
+                </button>
+              )}
+            </div>
+
             {/* Group 1: All-Time Summary Stat Quick Pill */}
             <button
               type="button"
@@ -465,36 +514,56 @@ export const Header: React.FC<HeaderProps> = ({
                               <span className="truncate">{u.fullName}</span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                                {u.roleLabel || u.role}
-                              </span>
-                              {u.pin && <Lock className="w-3 h-3 text-amber-500" />}
-                              {isCurrent && <CheckCircle2 className="w-3.5 h-3.5 text-rose-600" />}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                               <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                                 {u.roleLabel || u.role}
+                               </span>
+                               {(u.role === 'ADMIN' || u.pin) && (
+                                 <Lock className={`w-3 h-3 ${u.role === 'ADMIN' ? 'text-rose-600' : 'text-amber-500'}`} />
+                               )}
+                               {isCurrent && <CheckCircle2 className="w-3.5 h-3.5 text-rose-600" />}
+                             </div>
+                           </button>
+                         );
+                       })}
+                     </div>
+ 
+                     {/* Admin Panel and Change PIN buttons */}
+                     <div className="p-2 mt-1 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                       {onOpenChangePin && (
+                         <button
+                           type="button"
+                           onClick={() => {
+                             setUserMenuOpen(false);
+                             onOpenChangePin();
+                           }}
+                           className="w-full text-left px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/40 hover:bg-amber-100/90 dark:hover:bg-amber-900/50 rounded-lg flex items-center justify-between transition-colors cursor-pointer"
+                           title="ប្តូរលេខកូដសម្ងាត់ Admin តាមតម្រូវការ"
+                         >
+                           <div className="flex items-center gap-1.5">
+                             <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                             <span>ប្តូរលេខកូដសម្ងាត់ Admin</span>
+                           </div>
+                           <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold">PIN</span>
+                         </button>
+                       )}
 
-                    {/* Admin Panel button */}
-                    <div className="p-2 mt-1 border-t border-slate-100 dark:border-slate-800">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          onOpenAdminModal();
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50/70 dark:bg-rose-950/40 hover:bg-rose-100/70 dark:hover:bg-rose-900/50 rounded-lg flex items-center justify-between transition-colors cursor-pointer"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-rose-600" />
-                          <span>គ្រប់គ្រងសិទ្ធិ & អ្នកប្រើ (Admin Panel)</span>
-                        </div>
-                        <Sliders className="w-3.5 h-3.5 text-rose-400" />
-                      </button>
-                    </div>
-                  </div>
-                </>
+                       <button
+                         type="button"
+                         onClick={() => {
+                           setUserMenuOpen(false);
+                           onOpenAdminModal();
+                         }}
+                         className="w-full text-left px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50/70 dark:bg-rose-950/40 hover:bg-rose-100/70 dark:hover:bg-rose-900/50 rounded-lg flex items-center justify-between transition-colors cursor-pointer"
+                       >
+                         <div className="flex items-center gap-1.5">
+                           <ShieldCheck className="w-4 h-4 text-rose-600" />
+                           <span>គ្រប់គ្រងសិទ្ធិ & អ្នកប្រើ (Admin Panel)</span>
+                         </div>
+                         <Sliders className="w-3.5 h-3.5 text-rose-400" />
+                       </button>
+                     </div>
+                   </div>
+                 </>
               )}
             </div>
 

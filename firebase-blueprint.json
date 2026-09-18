@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "events": {
+      "title": "events",
+      "description": "Wedding and celebration events list",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "eventType": { "type": "string" },
+        "date": { "type": "string" },
+        "hostName": { "type": "string" },
+        "location": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "title", "eventType", "date", "hostName"]
+    },
+    "gifts": {
+      "title": "gifts",
+      "description": "Gift contributions and envelope records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "eventId": { "type": "string" },
+        "guestName": { "type": "string" },
+        "phone": { "type": "string" },
+        "relationship": { "type": "string" },
+        "tableNumber": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "notes": { "type": "string" },
+        "recordedAt": { "type": "string" }
+      },
+      "required": ["id", "eventId", "guestName", "amount", "currency", "status", "paymentMethod", "recordedAt"]
+    },
+    "users": {
+      "title": "users",
+      "description": "App users, roles and RBAC permissions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string" },
+        "roleLabel": { "type": "string" },
+        "avatarColor": { "type": "string" },
+        "pin": { "type": "string" },
+        "permissions": { "type": "object" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "username", "fullName", "role", "permissions"]
+    }
+  },
+  "firestore": {
+    "/events/{eventId}": {
+      "schema": "#/entities/events",
+      "description": "Celebration events"
+    },
+    "/gifts/{giftId}": {
+      "schema": "#/entities/gifts",
+      "description": "Gift contributions"
+    },
+    "/users/{userId}": {
+      "schema": "#/entities/users",
+      "description": "Users and role permissions"
+    }
+  }
+}
