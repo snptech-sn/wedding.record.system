@@ -107,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-rose-50/70 dark:bg-rose-950/40 hover:bg-rose-100/70 dark:hover:bg-rose-900/50 border border-rose-200/80 dark:border-rose-900/60 text-rose-900 dark:text-rose-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 sm:gap-2 h-9 px-3 rounded-xl text-xs sm:text-sm font-medium bg-rose-50/80 dark:bg-rose-950/40 hover:bg-rose-100/80 dark:hover:bg-rose-900/50 border border-rose-200/80 dark:border-rose-900/60 text-rose-900 dark:text-rose-200 transition-all shadow-2xs cursor-pointer"
                 >
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
                   <span className="max-w-[140px] sm:max-w-[200px] truncate font-semibold">
@@ -210,20 +210,20 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Right Column: Clean, Grouped & Beautifully Organized Actions Toolbar */}
-          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+          <div className="flex items-center justify-end gap-1.5 sm:gap-2 flex-wrap lg:flex-nowrap">
             
             {/* Group 1: All-Time Summary Stat Quick Pill */}
             <button
               type="button"
               onClick={onOpenAllTimeSummary}
               title="ចុចដើម្បីមើលរបាយការណ៍សរុបគ្រប់កម្មវិធីទាំងអស់"
-              className="inline-flex items-center gap-1.5 sm:gap-2 h-9 px-2.5 sm:px-3 text-xs font-medium text-slate-800 dark:text-slate-200 bg-amber-50/90 dark:bg-amber-950/30 hover:bg-amber-100/80 dark:hover:bg-amber-900/40 border border-amber-200/90 dark:border-amber-800/60 rounded-xl transition-all shadow-2xs group cursor-pointer active:scale-98"
+              className="inline-flex items-center gap-1.5 sm:gap-2 h-9 px-2 sm:px-2.5 text-xs font-medium text-slate-800 dark:text-slate-200 bg-amber-50/90 dark:bg-amber-950/30 hover:bg-amber-100/80 dark:hover:bg-amber-900/40 border border-amber-200/80 dark:border-amber-800/60 rounded-xl transition-all shadow-2xs group cursor-pointer active:scale-98 shrink-0"
             >
-              <div className="w-5 h-5 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
                 <TrendingUp className="w-3.5 h-3.5" />
               </div>
               <div className="flex items-center gap-1.5 whitespace-nowrap">
-                <span className="font-semibold text-amber-900 dark:text-amber-300 hidden xl:inline">សរុប:</span>
+                <span className="font-semibold text-amber-900 dark:text-amber-300 hidden 2xl:inline">សរុប:</span>
                 {canViewStats ? (
                   <>
                     <span className="font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(allTimeStats.totalPaidUSD, 'USD')}</span>
@@ -237,7 +237,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* Group 2: Tools & Export (Desktop Segmented Toolbar) */}
-            <div className="hidden sm:inline-flex items-center h-9 p-0.5 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs">
+            <div className="hidden sm:inline-flex items-center h-9 p-0.5 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs shadow-2xs">
               {canExportPrint && (
                 <>
                   <button
@@ -249,7 +249,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <Printer className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                     <span className="hidden md:inline">បោះពុម្ព</span>
                   </button>
-                  <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700" />
+                  <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700 self-center" />
                   <button
                     type="button"
                     onClick={onExportCSV}
@@ -259,7 +259,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     <span className="hidden md:inline">Excel</span>
                   </button>
-                  <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700" />
+                  <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700 self-center" />
                 </>
               )}
               <button
@@ -278,7 +278,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="inline-flex items-center justify-center w-9 h-9 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer"
+                className="inline-flex items-center justify-center w-9 h-9 text-slate-600 dark:text-slate-300 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 rounded-xl shadow-2xs cursor-pointer active:scale-98"
                 title="ឧបករណ៍ & ទាញយក"
               >
                 <MoreVertical className="w-4 h-4" />
@@ -336,10 +336,10 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="inline-flex items-center gap-1.5 h-9 px-2 sm:px-2.5 text-xs font-medium bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all cursor-pointer text-slate-800 dark:text-slate-200 shadow-2xs"
+                className="inline-flex items-center gap-2 h-9 px-2.5 text-xs font-medium bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 rounded-xl transition-all cursor-pointer text-slate-800 dark:text-slate-200 shadow-2xs active:scale-98"
                 title="ប្តូរគណនី ឬ មើលសិទ្ធិប្រើប្រាស់"
               >
-                <div className={`w-5.5 h-5.5 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 text-white shadow-2xs ${
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 text-white shadow-2xs ${
                   currentUser?.role === 'ADMIN'
                     ? 'bg-rose-600'
                     : currentUser?.role === 'RECORDER'
@@ -349,7 +349,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'bg-purple-600'
                 }`}>
                   {currentUser?.role === 'ADMIN' ? (
-                    <Shield className="w-3 h-3" />
+                    <Shield className="w-3.5 h-3.5" />
                   ) : (
                     currentUser?.fullName?.charAt(0) || 'U'
                   )}
@@ -503,10 +503,10 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={onOpenAdminModal}
               title="កំណត់សិទ្ធិ & គ្រប់គ្រងអ្នកប្រើ (Admin Panel)"
-              className={`inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-semibold rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95 ${
+              className={`inline-flex items-center gap-1.5 h-9 px-2.5 sm:px-3 text-xs font-semibold rounded-xl transition-all shadow-2xs cursor-pointer active:scale-98 ${
                 canManageUsers
-                  ? 'bg-rose-50/90 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 hover:bg-rose-100 border border-rose-200 dark:border-rose-900/60'
-                  : 'bg-slate-100/90 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200 dark:border-slate-700'
+                  ? 'bg-rose-50/90 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 hover:bg-rose-100/80 border border-rose-200/80 dark:border-rose-900/60'
+                  : 'bg-slate-100/90 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 border border-slate-200/80 dark:border-slate-700/80'
               }`}
             >
               <ShieldCheck className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
@@ -519,7 +519,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onToggleTheme}
               title={theme === 'dark' ? 'ប្តូរទៅ Light Mode (សម្រាប់ពេលថ្ងៃ)' : 'ប្តូរទៅ Dark Mode (សម្រាប់ពេលយប់)'}
               aria-label="Toggle dark mode"
-              className="inline-flex items-center justify-center w-9 h-9 text-slate-600 dark:text-amber-400 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+              className="inline-flex items-center justify-center w-9 h-9 text-slate-600 dark:text-amber-400 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-98 shrink-0"
             >
               {theme === 'dark' ? (
                 <Sun className="w-4 h-4 text-amber-400 fill-amber-400/20" />
@@ -533,10 +533,10 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onOpenNewGiftModal}
-                className="inline-flex items-center gap-1.5 sm:gap-2 h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 rounded-xl transition-all shadow-sm shadow-rose-200 dark:shadow-none active:scale-98 cursor-pointer shrink-0"
+                className="inline-flex items-center justify-center gap-1.5 h-9 px-3 sm:px-3.5 text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 border border-transparent rounded-xl transition-all shadow-sm shadow-rose-200 dark:shadow-none active:scale-98 cursor-pointer shrink-0 whitespace-nowrap self-center"
               >
-                <Plus className="w-4 h-4" />
-                <span className="whitespace-nowrap">កត់ចំណងដៃ</span>
+                <Plus className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap leading-none">កត់ចំណងដៃ</span>
               </button>
             )}
 
